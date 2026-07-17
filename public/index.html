@@ -8,6 +8,10 @@
     <title>Bible Reader</title>
 
     <link href="./bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+
 
     <style>
         html,
@@ -23,14 +27,21 @@
             min-height: 70vh;
         }
 
-        #verseText {
-            font-size: 2rem;
-            line-height: 1.8;
-        }
-
         #reference {
             font-size: 2.2rem;
             font-weight: bold;
+        }
+
+        #verseText {
+            font-family: "Merriweather", serif;
+            font-size: clamp(2rem, 3vw, 3.25rem);
+            line-height: 1.9;
+        }
+
+        #reference {
+            font-family: "Merriweather", serif;
+            font-size: 2rem;
+            font-weight: 700;
         }
     </style>
 
@@ -98,8 +109,35 @@
         const API = "";
 
         let books = [];
+        let currentVerse = null;
 
         const historyKey = "bible-history";
+
+        document.addEventListener("keydown", function (e) {
+
+            // Ignore when typing in inputs
+            if (
+                e.target.tagName === "INPUT" ||
+                e.target.tagName === "TEXTAREA"
+            )
+                return;
+
+            if (e.key === "ArrowRight") {
+
+                e.preventDefault();
+                nextVerse();
+
+            }
+
+            if (e.key === "ArrowLeft") {
+
+                e.preventDefault();
+                previousVerse();
+
+            }
+
+        });
+
 
         async function loadBooks() {
 
@@ -150,31 +188,41 @@
         async function searchVerse() {
 
             const book = document.getElementById("book").value.trim();
-
             const chapter = document.getElementById("chapter").value;
-
             const verse = document.getElementById("verse").value;
 
             if (!book || !chapter || !verse)
                 return;
 
-            const url = `${API}/verse/${encodeURIComponent(book)}/${chapter}/${verse}`;
+            await loadVerse(book, chapter, verse);
 
-            const res = await fetch(url);
+        }
+
+        async function loadVerse(book, chapter, verse) {
+
+            const res = await fetch(
+                `${API}/verse/${encodeURIComponent(book)}/${chapter}/${verse}`
+            );
+
+            if (!res.ok)
+                return false;
 
             const json = await res.json();
 
-            if (!json.success) {
-
-                document.getElementById("reference").innerHTML = "";
-
-                document.getElementById("verseText").innerHTML = "Verse not found.";
-
-                return;
-
-            }
+            if (!json.success)
+                return false;
 
             const data = json.data;
+
+            currentVerse = {
+                book: data.book,
+                chapter: Number(data.chapter),
+                verse: Number(data.verse)
+            };
+
+            document.getElementById("book").value = data.book;
+            document.getElementById("chapter").value = data.chapter;
+            document.getElementById("verse").value = data.verse;
 
             document.getElementById("reference").innerHTML =
                 `${data.book} ${data.chapter}:${data.verse}`;
@@ -184,7 +232,89 @@
 
             addHistory(data);
 
+            return true;
         }
+
+        async function nextVerse() {
+
+            if (!currentVerse)
+                return;
+
+            let {
+                book,
+                chapter,
+                verse
+            } = currentVerse;
+
+            verse++;
+
+            let ok = await loadVerse(book, chapter, verse);
+
+            if (!ok) {
+
+                chapter++;
+                verse = 1;
+
+                await loadVerse(book, chapter, verse);
+
+            }
+
+        }
+
+        async function previousVerse() {
+
+            if (!currentVerse)
+                return;
+            // Don't go back if already at verse 1
+            if (currentVerse.verse === 1)
+                return;
+
+            let {
+                book,
+                chapter,
+                verse
+            } = currentVerse;
+
+            verse--;
+
+            if (verse < 1) {
+
+                chapter--;
+
+                if (chapter < 1)
+                    return;
+
+                // try the last verses of previous chapter
+                for (let v = 200; v >= 1; v--) {
+
+                    let ok = await loadVerse(book, chapter, v);
+
+                    if (ok)
+                        return;
+
+                }
+
+                return;
+
+            }
+
+            let ok = await loadVerse(book, chapter, verse);
+
+            if (!ok) {
+
+                for (let v = verse - 1; v >= 1; v--) {
+
+                    ok = await loadVerse(book, chapter, v);
+
+                    if (ok)
+                        return;
+
+                }
+
+            }
+
+        }
+
 
         function addHistory(data) {
 

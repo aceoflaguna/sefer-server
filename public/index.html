@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Bible Reader</title>
+
+    <link href="./bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            background: #f8f9fa;
+        }
+
+        #verseContainer {
+            min-height: 70vh;
+        }
+
+        #verseText {
+            font-size: 2rem;
+            line-height: 1.8;
+        }
+
+        #reference {
+            font-size: 2.2rem;
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container-fluid vh-100 d-flex flex-column">
+
+        <div class="bg-white shadow-sm p-3">
+
+            <div class="row g-2">
+
+                <div class="col-md-5">
+
+                    <input id="book" class="form-control" list="books" placeholder="Book">
+
+                    <datalist id="books"></datalist>
+
+                </div>
+
+                <div class="col-md-2">
+                    <input id="chapter" class="form-control" type="number" placeholder="Chapter">
+                </div>
+
+                <div class="col-md-2">
+                    <input id="verse" class="form-control" type="number" placeholder="Verse">
+                </div>
+
+                <div class="col-md-2">
+
+                    <select id="history" class="form-select">
+                        <option value="">History</option>
+                    </select>
+
+                </div>
+
+                <div class="col-md-1 d-grid">
+                    <button class="btn btn-primary" id="searchBtn">
+                        Go
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="verseContainer" class="flex-grow-1 d-flex justify-content-center align-items-center">
+
+            <div class="text-center w-75">
+
+                <div id="reference"></div>
+
+                <div id="verseText" class="mt-4">
+                    Search for a Bible verse.
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const API = "";
+
+        let books = [];
+
+        const historyKey = "bible-history";
+
+        async function loadBooks() {
+
+            const cached = localStorage.getItem("books-cache");
+
+            if (cached) {
+
+                books = JSON.parse(cached);
+
+                populateBooks();
+
+                return;
+            }
+
+            const res = await fetch(API + "/books");
+
+            const json = await res.json();
+
+            books = json.data;
+
+            localStorage.setItem(
+                "books-cache",
+                JSON.stringify(books)
+            );
+
+            populateBooks();
+
+        }
+
+        function populateBooks() {
+
+            const dl = document.getElementById("books");
+
+            dl.innerHTML = "";
+
+            books.forEach(book => {
+
+                const opt = document.createElement("option");
+
+                opt.value = book.name;
+
+                dl.appendChild(opt);
+
+            });
+
+        }
+
+        async function searchVerse() {
+
+            const book = document.getElementById("book").value.trim();
+
+            const chapter = document.getElementById("chapter").value;
+
+            const verse = document.getElementById("verse").value;
+
+            if (!book || !chapter || !verse)
+                return;
+
+            const url = `${API}/verse/${encodeURIComponent(book)}/${chapter}/${verse}`;
+
+            const res = await fetch(url);
+
+            const json = await res.json();
+
+            if (!json.success) {
+
+                document.getElementById("reference").innerHTML = "";
+
+                document.getElementById("verseText").innerHTML = "Verse not found.";
+
+                return;
+
+            }
+
+            const data = json.data;
+
+            document.getElementById("reference").innerHTML =
+                `${data.book} ${data.chapter}:${data.verse}`;
+
+            document.getElementById("verseText").innerHTML =
+                data.text;
+
+            addHistory(data);
+
+        }
+
+        function addHistory(data) {
+
+            let history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+
+            const ref = `${data.book} ${data.chapter}:${data.verse}`;
+
+            history = history.filter(x => x.ref !== ref);
+
+            history.unshift({
+
+                ref,
+
+                book: data.book,
+
+                chapter: data.chapter,
+
+                verse: data.verse
+
+            });
+
+            history = history.slice(0, 10);
+
+            localStorage.setItem(historyKey, JSON.stringify(history));
+
+            loadHistory();
+
+        }
+
+        function loadHistory() {
+
+            const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+
+            const select = document.getElementById("history");
+
+            select.innerHTML = '<option value="">History</option>';
+
+            history.forEach(item => {
+
+                const opt = document.createElement("option");
+
+                opt.value = JSON.stringify(item);
+
+                opt.textContent = item.ref;
+
+                select.appendChild(opt);
+
+            });
+
+        }
+
+        document.getElementById("history")
+            .addEventListener("change", function () {
+
+                if (!this.value)
+                    return;
+
+                const item = JSON.parse(this.value);
+
+                document.getElementById("book").value = item.book;
+
+                document.getElementById("chapter").value = item.chapter;
+
+                document.getElementById("verse").value = item.verse;
+
+                searchVerse();
+
+            });
+
+        document.getElementById("searchBtn")
+            .addEventListener("click", searchVerse);
+
+        ["book", "chapter", "verse"].forEach(id => {
+
+            document.getElementById(id)
+                .addEventListener("keypress", e => {
+
+                    if (e.key === "Enter")
+                        searchVerse();
+
+                });
+
+        });
+
+        loadBooks();
+
+        loadHistory();
+    </script>
+
+</body>
+
+</html>

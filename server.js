@@ -109,7 +109,7 @@ app.get("/chapter/:book/:chapter", (req, res) => {
  */
 app.get("/books", (req, res) => {
     db.all(
-        "SELECT id, name FROM ASV_books ORDER BY id",
+        "SELECT id, name FROM ASV_books WHERE id < 67 ORDER BY id",
         [],
         (err, rows) => {
             if (err) {

@@ -6,16 +6,15 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-
 const PORT = process.env.PORT || 3000;
 
 // Open SQLite database
-const db = new sqlite3.Database("./sqlite/ASV.db", (err) => {
-    if (err) {
-        console.error("Database connection failed:", err.message);
-    } else {
-        console.log("Connected to SQLite database.");
-    }
+const db = new sqlite3.Database("./sqlite/ASV_YHWH.db", (err) => {
+  if (err) {
+    console.error("Database connection failed:", err.message);
+  } else {
+    console.log("Connected to SQLite database.");
+  }
 });
 
 /**
@@ -26,9 +25,9 @@ const db = new sqlite3.Database("./sqlite/ASV.db", (err) => {
  * /verse/Genesis/1/1
  */
 app.get("/verse/:book/:chapter/:verse", (req, res) => {
-    const { book, chapter, verse } = req.params;
+  const { book, chapter, verse } = req.params;
 
-    const sql = `
+  const sql = `
         SELECT
             b.name AS book,
             v.chapter,
@@ -43,26 +42,26 @@ app.get("/verse/:book/:chapter/:verse", (req, res) => {
         LIMIT 1
     `;
 
-    db.get(sql, [book, chapter, verse], (err, row) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+  db.get(sql, [book, chapter, verse], (err, row) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
 
-        if (!row) {
-            return res.status(404).json({
-                success: false,
-                message: "Verse not found."
-            });
-        }
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: "Verse not found.",
+      });
+    }
 
-        res.json({
-            success: true,
-            data: row
-        });
+    res.json({
+      success: true,
+      data: row,
     });
+  });
 });
 
 /**
@@ -72,9 +71,9 @@ app.get("/verse/:book/:chapter/:verse", (req, res) => {
  * /chapter/John/3
  */
 app.get("/chapter/:book/:chapter", (req, res) => {
-    const { book, chapter } = req.params;
+  const { book, chapter } = req.params;
 
-    const sql = `
+  const sql = `
         SELECT
             b.name AS book,
             v.chapter,
@@ -88,45 +87,96 @@ app.get("/chapter/:book/:chapter", (req, res) => {
         ORDER BY v.verse
     `;
 
-    db.all(sql, [book, chapter], (err, rows) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+  db.all(sql, [book, chapter], (err, rows) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
 
-        res.json({
-            success: true,
-            count: rows.length,
-            data: rows
-        });
+    res.json({
+      success: true,
+      count: rows.length,
+      data: rows,
     });
+  });
 });
 
 /**
  * GET /books
  */
 app.get("/books", (req, res) => {
-    db.all(
-        "SELECT id, name FROM ASV_books WHERE id < 67 ORDER BY id",
-        [],
-        (err, rows) => {
-            if (err) {
-                return res.status(500).json({
-                    success: false,
-                    error: err.message
-                });
-            }
+  db.all(
+    "SELECT id, name FROM ASV_books WHERE id < 67 ORDER BY id",
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
 
-            res.json({
-                success: true,
-                data: rows
-            });
-        }
-    );
+      res.json({
+        success: true,
+        data: rows,
+      });
+    },
+  );
+});
+
+app.get("/api/books", (req, res) => {
+  db.all(
+    "SELECT id,name FROM ASV_books WHERE id < 67 ORDER BY id",
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json(err);
+
+      res.json(rows);
+    },
+  );
+});
+
+app.get("/api/search", (req, res) => {
+  const keyword = req.query.keyword || "";
+  const book = req.query.book || "all";
+
+  let sql = `
+    SELECT
+        v.id,
+        b.name book,
+        v.chapter,
+        v.verse,
+        v.text
+    FROM ASV_verses v
+    JOIN ASV_books b
+        ON b.id=v.book_id
+    WHERE v.text LIKE ?
+    `;
+
+  const params = [`%${keyword}%`];
+
+  if (book !== "all") {
+    sql += " AND book_id=?";
+    params.push(book);
+  }
+
+  sql += `
+    ORDER BY
+        book_id,
+        chapter,
+        verse
+    LIMIT 500
+    `;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json(err);
+
+    res.json(rows);
+  });
 });
 
 app.listen(PORT, () => {
-    console.log(`Bible API running on http://localhost:${PORT}`);
+  console.log(`Bible API running on http://localhost:${PORT}`);
 });

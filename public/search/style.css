@@ -1,0 +1,25 @@
+.highlight{
+    background:yellow;
+    font-weight:bold;
+}
+
+textarea{
+    resize:vertical;
+}
+
+.card{
+    margin-bottom:15px;
+}
+
+.editor {
+    background-color: #d1fae5; /* light mint */
+}
+.card-body{
+    position: relative;
+}
+
+.remove-btn{
+    position: absolute;
+    right: 15px;
+    top: 15px;
+}
